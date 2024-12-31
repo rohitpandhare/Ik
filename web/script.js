@@ -83,19 +83,18 @@ function displayResults(data) {
 }
 
 function displayDocument(doc) {
-    // Remove any existing modals
-    const existingModal = document.querySelector('.modal');
-    if (existingModal) {
-        existingModal.remove();
-    }
-
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
                 <h2>${doc.title || 'Document'}</h2>
-                <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+                <div class="header-controls">
+                    <button class="download-btn" onclick="downloadDocument('${doc.title}', this)">
+                        <span class="download-icon">📥</span> Download PDF
+                    </button>
+                    <span class="close" onclick="this.closest('.modal').remove()">✖</span>
+                </div>
             </div>
             <div class="document-content">
                 ${doc.doc || 'No content available'}
@@ -103,22 +102,64 @@ function displayDocument(doc) {
         </div>
     `;
 
-    // Close modal when clicking outside content
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.remove();
-        }
-    });
-
-    // Close modal with Escape key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && document.querySelector('.modal')) {
-            modal.remove();
-        }
-    });
-
     document.body.appendChild(modal);
 }
+
+
+async function downloadDocument(title, buttonElement) {
+    try {
+        // Save original button text
+        const originalText = buttonElement.innerHTML;
+        buttonElement.innerHTML = '⌛ Generating PDF...';
+        buttonElement.disabled = true;
+
+        const content = document.querySelector('.modal .document-content');
+
+        // Clone the document-content for PDF generation to capture full content
+        const contentClone = content.cloneNode(true);
+
+        // Create a temporary container for capturing the entire div
+        const tempContainer = document.createElement('div');
+        tempContainer.style.width = '100%';
+        tempContainer.appendChild(contentClone);
+
+        // Append the temporary container to the body to ensure it's rendered
+        document.body.appendChild(tempContainer);
+
+        // Configure PDF options
+        const opt = {
+            margin: [0.5, 0.5, 0.5, 0.5], // Inches: [top, right, bottom, left]
+            filename: `${title.replace(/[^a-z0-9]/gi, '_')}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: {
+                scale: 2, // Higher scale for better quality
+                useCORS: true, // Allow loading of cross-origin images
+                letterRendering: true,
+            },
+            jsPDF: {
+                unit: 'in',
+                format: 'a4',
+                orientation: 'portrait',
+            },
+        };
+
+        // Generate and download the PDF
+        await html2pdf().set(opt).from(tempContainer).save();
+
+        // Restore button state
+        buttonElement.innerHTML = originalText;
+        buttonElement.disabled = false;
+
+        // Clean up temporary container
+        tempContainer.remove();
+    } catch (error) {
+        console.error('PDF generation failed:', error);
+        alert('Failed to generate PDF. Please try again.');
+        buttonElement.innerHTML = originalText;
+        buttonElement.disabled = false;
+    }
+}
+
 
 // Add event listener for Enter key in search input
 document.getElementById('searchInput').addEventListener('keypress', (e) => {
