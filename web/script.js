@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:5000"; // Update this if needed based on your server configuration
+const BASE_URL = "http://localhost:5000";
 
 async function performSearch() {
     const searchInput = document.getElementById('searchInput');
@@ -11,17 +11,17 @@ async function performSearch() {
     }
 
     try {
-        resultsDiv.innerHTML = '<p>Searching...</p>';
+        resultsDiv.innerHTML = '<p class="loading">Searching...</p>';
 
         const response = await fetch(`${BASE_URL}/search/`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 formInput: query,
-                pagenum: 0, // Default to first page
-            }),
+                pagenum: 0
+            })
         });
 
         if (!response.ok) {
@@ -33,7 +33,7 @@ async function performSearch() {
 
     } catch (error) {
         console.error('Search error:', error);
-        resultsDiv.innerHTML = '<p class="error">Error performing search.</p>';
+        resultsDiv.innerHTML = '<p class="error">Error performing search</p>';
     }
 }
 
@@ -42,107 +42,87 @@ async function getDocument(docid) {
         const response = await fetch(`${BASE_URL}/doc/${docid}/`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-            },
+                'Content-Type': 'application/json'
+            }
         });
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const doc = await response.json();
-        displayDocument(doc);
+        const data = await response.json();
+        displayDocument(data);
 
     } catch (error) {
         console.error('Document fetch error:', error);
-        alert('Error fetching document.');
+        alert('Error fetching document');
     }
 }
 
 function displayResults(data) {
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = '';
-
+    
     if (!data.docs || data.docs.length === 0) {
-        resultsDiv.innerHTML = '<p>No results found.</p>';
+        resultsDiv.innerHTML = '<p class="no-results">No results found</p>';
         return;
     }
 
-    const html = data.docs
-        .map(
-            (doc) => `
+    const html = data.docs.map(doc => `
         <div class="result-item">
             <h3>${doc.title || 'Untitled'}</h3>
             <div class="fragment">${doc.headline || ''}</div>
-            <div class="source">${doc.docsource || ''}</div>
-            <button onclick="getDocument('${doc.tid}')">View Document</button>
+            <div class="meta-info">
+                <span class="source">${doc.docsource || ''}</span>
+                <span class="date">${doc.posted_date || ''}</span>
+            </div>
+            <button onclick="getDocument('${doc.tid}')" class="view-doc-btn">View Document</button>
         </div>
-    `
-        )
-        .join('');
+    `).join('');
 
     resultsDiv.innerHTML = html;
 }
 
 function displayDocument(doc) {
+    // Remove any existing modals
+    const existingModal = document.querySelector('.modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
     const modal = document.createElement('div');
     modal.className = 'modal';
-    
-    const contentId = `doc-content-${Date.now()}`;
-    
     modal.innerHTML = `
         <div class="modal-content">
-            <div class="document-header">
-                <button class="download-btn" onclick="downloadAsPDF('${contentId}', '${doc.title}')">
-                    Download PDF
-                </button>
-                <span class="close" onclick="closeModal(this)">&times;</span>
+            <div class="modal-header">
+                <h2>${doc.title || 'Document'}</h2>
+                <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
             </div>
-            <div id="${contentId}" class="document-content">
+            <div class="document-content">
                 ${doc.doc || 'No content available'}
             </div>
         </div>
     `;
+
+    // Close modal when clicking outside content
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.querySelector('.modal')) {
+            modal.remove();
+        }
+    });
+
     document.body.appendChild(modal);
 }
 
-// Add this new function to handle modal closing
-function closeModal(element) {
-    // Find and remove the parent modal element
-    const modal = element.closest('.modal');
-    if (modal) {
-        modal.remove();
+// Add event listener for Enter key in search input
+document.getElementById('searchInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        performSearch();
     }
-}
-
-
-function downloadAsPDF(contentId, title) {
-    // Get the content element by ID
-    const content = document.getElementById(contentId);
-
-    // PDF options
-    const options = {
-        margin: 1,
-        filename: `${title || 'document'}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
-    };
-
-    // Indicate loading state
-    const downloadBtn = document.querySelector('.download-btn');
-    const originalText = downloadBtn.innerHTML;
-    downloadBtn.innerHTML = 'Generating PDF...';
-    downloadBtn.disabled = true;
-
-    // Generate and save PDF
-    html2pdf().set(options).from(content).save().then(() => {
-        downloadBtn.innerHTML = originalText;
-        downloadBtn.disabled = false;
-    }).catch((error) => {
-        downloadBtn.innerHTML = originalText;
-        downloadBtn.disabled = false;
-        console.error('Error generating PDF:', error);
-        alert('Failed to generate PDF. Please try again.');
-    });
-}
+});

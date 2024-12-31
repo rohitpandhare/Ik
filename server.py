@@ -3,6 +3,13 @@ from flask_cors import CORS
 import logging
 import requests
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 CORS(app)
 
@@ -11,7 +18,8 @@ BASE_URL = "https://api.indiankanoon.org"
 
 def get_headers():
     return {
-        'Authorization': f"Token {API_KEY}"
+        'Authorization': f"Token {API_KEY}",
+        'Content-Type': 'application/x-www-form-urlencoded'
     }
 
 @app.route('/search/', methods=['POST'])
@@ -25,16 +33,17 @@ def search():
             return jsonify({'error': 'Query parameter is required'}), 400
 
         url = f"{BASE_URL}/search/"
-        params = {
+        payload = {
             'formInput': query,
             'pagenum': pagenum
         }
 
-        response = requests.post(url, params=params, headers=get_headers())
+        response = requests.post(url, data=payload, headers=get_headers())
         response.raise_for_status()
         return jsonify(response.json())
 
     except Exception as e:
+        logger.error(f"Search error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/doc/<docid>/', methods=['POST'])
@@ -46,7 +55,8 @@ def get_document(docid):
         return jsonify(response.json())
 
     except Exception as e:
+        logger.error(f"Document fetch error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
